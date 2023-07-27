@@ -1,5 +1,6 @@
 import { ListDownAllFilesAndFetchData, GetEachContentFromFile } from "./helpers/workers.js";
 import Logs from "./lib/logs.js";
+import { CONSOLE_COLORS, CONSOLE_CONSTANTS } from "./constants.js";
 
 const worker = {
   checkOutcome: {
@@ -31,7 +32,7 @@ const worker = {
 
     Logs.appendLogs(checkData.id, dataToBeLogged, (err) => {
       if (err) {
-        console.log("Error: Unable to log activities to file");
+        console.log(CONSOLE_COLORS.RED, "Error: Unable to log activities to file");
       } else {
         console.log("Data logged in file successfully");
       }
@@ -39,7 +40,7 @@ const worker = {
   },
 
   init: function() {
-    console.log("Workers thread started!");
+    console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Workers thread started!`);
     this.loop();
   },
 };
