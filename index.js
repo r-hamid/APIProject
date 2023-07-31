@@ -1,18 +1,18 @@
 import Server from "./server.js";
-import worker from "./workers.js";
+import Worker from "./workers.js";
 
-class App extends Server {
+class App extends Worker {
   constructor() {
     super();
-    this.createServer();
+    this.initWorker();
   }
 
   init() {
     // statring server
-    this.initServer();
+    // this.initServer();
 
     // Starting worker
-    worker.init();
+    // worker.init();
   }
 }
 

@@ -11,6 +11,8 @@ import {
   protocolsAcceptedForChecks,
   checkProtocol,
   CheckURLState,
+  CONSOLE_COLORS,
+  CONSOLE_CONSTANTS,
 } from "../constants.js";
 
 function alertUserToStatusChange(newCheckData) {
@@ -87,7 +89,7 @@ function validateData(checkData) {
 }
 
 function parseDataToSendRequest(checkData) {
-  let { protocol, url, method, timeOutSeconds } = checkData;
+  let { protocol, url, method } = checkData;
 
   // Adding details to send request
   const requestDetails = parse(`${protocol}://${url}`, true);
@@ -121,33 +123,29 @@ function parseDataToSendRequest(checkData) {
   requestData.end();
 }
 
-function GetEachContentFromFile(fileList) {
-  fileList.forEach((fileName) => {
-    fileName = fileName.replace('.json', '');
-    readData(checkFilesDirName, fileName, (err, checkData) => {
-      if (err && !checkData) console.log(`Error while reading ${fileName}`);
-      else {
-        const parsedData = JSON.parse(checkData);
-        const isDataValidated = validateData(parsedData);
-        if (isDataValidated) {
-          parseDataToSendRequest.call(this, parsedData);
-        }
-      }
-    });
-  });
+function getFileContent(fileName) {
+  const data = readData("checks", fileName);
+  if (!data.error) {
+    return data.data;
+  } else {
+    console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Data with the file ${fileName}.json not found`);
+  }
 }
 
-function ListDownAllFilesAndFetchData(callback) {
-  listFilesInADir(checkFilesDirName, (filesList) => {
-    if (typeof filesList === "object" && filesList instanceof Array) {
-      callback(filesList);
-    } else {
-      console.log("No files found in the checks directory");
-    }
-  });
+async function ListDownAllFilesAndFetchData() {
+  const fileList = await listFilesInADir(checkFilesDirName);
+
+  if (fileList.length === 0) {
+    console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} No checks have been defined by users yet`);
+    return { error: "No checks have been defined by users yet", fileList: [] }
+  } else {
+    return { error: false, fileList };
+  }
 }
 
 export {
+  parseDataToSendRequest,
   ListDownAllFilesAndFetchData,
-  GetEachContentFromFile,
+  getFileContent,
+  validateData,
 };
