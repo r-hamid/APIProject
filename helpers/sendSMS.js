@@ -6,7 +6,7 @@ import { parse } from "url";
 import envConfig from "../config.js";
 import { APIMethods, __dirname } from "../constants.js";
 
-const sendSMSViaTwilio = (phone, body, callback) => {
+function sendSMSViaTwilio(phone, body, callback) {
   phone = (typeof phone === "string" && phone.trim().length === 14) ? phone.trim() : false;
   body = (typeof body === "string" && body.trim().length > 0 && body.trim().length < 1600) ? body.trim() : false;
 
@@ -41,7 +41,7 @@ const sendSMSViaTwilio = (phone, body, callback) => {
     if (status === 200 || status === 201) {
       callback(false);
     } else {
-      callback("error with status code: ", status);
+      callback("error with status code: ", res);
     }
   });
 
@@ -55,6 +55,6 @@ const sendSMSViaTwilio = (phone, body, callback) => {
 
   // Sending request
   sendSMSRequest.end();
-};
+}
 
 export default sendSMSViaTwilio;

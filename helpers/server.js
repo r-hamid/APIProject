@@ -3,7 +3,7 @@ import { StringDecoder } from "string_decoder";
 
 import { routes, routeHandlers } from "../routes/index.js";
 
-const UnifiedServer = (req, res) => {
+function unifiedServer(req, res) {
   // Parsing URL to get request metadata
   const parsedURL = parse(req.url, true);
   const parsedPath = parsedURL.pathname.replaceAll('/', '');
@@ -14,7 +14,7 @@ const UnifiedServer = (req, res) => {
     headers: req.headers,
     method: req.method,
     queryParams: parsedURL.query,
-    body: '',
+    body: "",
   };
 
   // Checking for recieving the payload from request
@@ -46,4 +46,4 @@ const UnifiedServer = (req, res) => {
   });
 }
 
-export default UnifiedServer;
+export default unifiedServer;

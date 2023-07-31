@@ -21,11 +21,12 @@ class Worker {
       responseCode: 0,
     };
 
+    console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} ${fileName} check is being processed`);
     this.startProcessingCheck(fileName);
   }
 
-  startProcessingCheck(fileName) {
-    const data = this.getFileContentFromFileName(fileName);
+  async startProcessingCheck(fileName) {
+    const data = await this.getFileContentFromFileName(fileName);
     if (!data) return;
 
     const isValidated = validateData(data);
@@ -34,12 +35,12 @@ class Worker {
     parseDataToSendRequest.call(this, data);
   }
 
-  getFileContentFromFileName(fileName) {
-    const data = getFileContent(fileName);
+  async getFileContentFromFileName(fileName) {
+    const data = await getFileContent(fileName);
     return data;
   }
 
-  logs(checkData, state, alertWanted) {
+  async logs(checkData, state, alertWanted) {
     const dataToBeLogged = {
       check: checkData,
       state: state,
@@ -48,77 +49,33 @@ class Worker {
       time: Date.now(),
     };
 
-    Logs.appendLogs(checkData.id, dataToBeLogged, (err) => {
-      if (err) {
-        console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Error: Unable to log activities to file`);
-      } else {
-        console.log(CONSOLE_COLORS.GREEN, `${CONSOLE_CONSTANTS.WORKER} Data logged in file successfully`);
-      }
-    });
+    const { error } = await Logs.appendLogs(checkData.id, dataToBeLogged);
+    if (error) {
+      console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Error: Unable to log activities to file`);
+    } else {
+      console.log(CONSOLE_COLORS.GREEN, `${CONSOLE_CONSTANTS.WORKER} Data logged in file successfully`);
+    }
   }
 }
 
 class WorkerParent {
   async processChecks() {
-    console.log("Inside workers");
     const { error, fileList } = await ListDownAllFilesAndFetchData();
-    if (!error && fileList.length > 0) {
+
+    if (error) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} ${error}`);
+    else {
       fileList.forEach((fileName) => new Worker(fileName.replace('.json', '')));
     }
   }
 
-  initWorker() {
-    setInterval(() => {
-      this.processChecks();
-    }, 1000 * 5);
+  async initWorker() {
+    console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Wokers started for checks added by user`);
+    await this.processChecks();
+
+    setInterval(async () => {
+      await this.processChecks();
+    }, 1000 * 60);
   }
 }
-
-// const worker = {
-//   checkOutcome: {
-//     error: null,
-//     responseCode: 0,
-//   },
-//   isOutComeSent: false,
-
-//   listChecks: function() {
-//     ListDownAllFilesAndFetchData((fileList) => {
-//       GetEachContentFromFile.call(this, fileList);
-//     });
-//   },
-  
-//   loop: function() {
-//     setInterval(() => {
-//       this.listChecks();
-//     }, 1000 * 20);
-//   },
-
-//   logs: function(checkData, state, alertWanted) {
-//     const dataToBeLogged = {
-//       check: checkData,
-//       state: state,
-//       outcome: this.checkOutcome,
-//       alert: alertWanted,
-//       time: Date.now(),
-//     };
-
-//     Logs.appendLogs(checkData.id, dataToBeLogged, (err) => {
-//       if (err) {
-//         console.log(CONSOLE_COLORS.RED, "Error: Unable to log activities to file");
-//       } else {
-//         console.log("Data logged in file successfully");
-//       }
-//     });
-//   },
-
-//   init: function() {
-//     console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Workers thread started!`);
-//     this.loop();
-//   },
-// };
-
-// function initWorkers() {
-//   worker.init.bind(worker)();
-// }
 
 export default WorkerParent;

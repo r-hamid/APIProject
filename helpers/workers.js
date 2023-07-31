@@ -23,14 +23,14 @@ function alertUserToStatusChange(newCheckData) {
 
   sendSMS(phone, messageBody, (err) => {
     if(!err){
-      console.log("Success: User was alerted to a status change in their check, via sms: ",msg);
+      console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} User was alerted to a status change in their check, via sms`);
     } else {
-      console.log("Error: Could not send sms alert to user who had a state change in their check",err);
+      console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Could not send sms alert to user who had a state change in their check`);
     }
   });
 }
 
-function processCheckOutcome(checkData) {
+async function processCheckOutcome(checkData) {
   const { successCodes, lastChecked, state } = checkData;
 
   const currentState = !this.checkOutcome.error &&
@@ -44,16 +44,16 @@ function processCheckOutcome(checkData) {
   newCheckData.lastChecked = Date.now();
 
   this.logs(newCheckData, currentState, alertWanted);
-  updateFileContent("checks", newCheckData.id, newCheckData, (err) => {
-    if (err) console.log("Error trying to save updates to one of the checks");
-    else {
-      if (alertWanted) {
-        alertUserToStatusChange(newCheckData);
-      } else {
-        console.log("Check outcome has not changed, no alert needed");
-      }
+  const { error } = await updateFileContent("checks", newCheckData.id, newCheckData);
+
+  if (error) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} ${error}`);
+  else {
+    if (alertWanted) {
+      alertUserToStatusChange(newCheckData);
+    } else {
+      console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Check outcome has not changed, no alert needed`);
     }
-  });
+  }
 }
 
 function callbackForRequestError(checkData, err, message) {
@@ -123,19 +123,17 @@ function parseDataToSendRequest(checkData) {
   requestData.end();
 }
 
-function getFileContent(fileName) {
-  const data = readData("checks", fileName);
-  if (!data.error) {
-    return data.data;
-  } else {
-    console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Data with the file ${fileName}.json not found`);
-  }
+async function getFileContent(fileName) {
+  const { data, error } = await readData("checks", fileName);
+  if (error) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Data with the file ${fileName}.json not found`);
+  
+  return data;
 }
 
 async function ListDownAllFilesAndFetchData() {
-  const fileList = await listFilesInADir(checkFilesDirName);
+  const { error, fileList } = await listFilesInADir(checkFilesDirName);
 
-  if (fileList.length === 0) {
+  if (error) {
     console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} No checks have been defined by users yet`);
     return { error: "No checks have been defined by users yet", fileList: [] }
   } else {
