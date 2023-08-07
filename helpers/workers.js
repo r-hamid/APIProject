@@ -130,20 +130,23 @@ async function getFileContent(fileName) {
   return data;
 }
 
-async function ListDownAllFilesAndFetchData() {
+async function ListDownAllFiles() {
   const { error, fileList } = await listFilesInADir(checkFilesDirName);
 
   if (error) {
     console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} No checks have been defined by users yet`);
     return { error: "No checks have been defined by users yet", fileList: [] }
   } else {
+    const indexOfGitKeep = fileList.indexOf(".gitkeep");
+    if (indexOfGitKeep > -1) fileList.splice(indexOfGitKeep, 1);
+    if (fileList.length === 0) return { error: "No checks have been defined by users yet", fileList };
     return { error: false, fileList };
   }
 }
 
 export {
   parseDataToSendRequest,
-  ListDownAllFilesAndFetchData,
+  ListDownAllFiles,
   getFileContent,
   validateData,
 };

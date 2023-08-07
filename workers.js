@@ -1,6 +1,6 @@
 import { CONSOLE_COLORS, CONSOLE_CONSTANTS } from "./constants.js";
 import {
-  ListDownAllFilesAndFetchData,
+  ListDownAllFiles,
   getFileContent,
   validateData,
   parseDataToSendRequest,
@@ -60,11 +60,11 @@ class Worker {
 
 class WorkerParent {
   async processChecks() {
-    const { error, fileList } = await ListDownAllFilesAndFetchData();
+    const { error, fileList } = await ListDownAllFiles();
 
     if (error) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} ${error}`);
     else {
-      fileList.forEach((fileName) => new Worker(fileName.replace('.json', '')));
+      fileList.forEach((fileName) => new Worker(fileName.replace(".json", "")));
     }
   }
 
