@@ -49,11 +49,11 @@ class Worker {
       time: Date.now(),
     };
 
-    const { error } = await Logs.appendLogs(checkData.id, dataToBeLogged);
+    const { error } = await new Logs().appendLogs(checkData.id, dataToBeLogged);
     if (error) {
       console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Error: Unable to log activities to file`);
     } else {
-      console.log(CONSOLE_COLORS.GREEN, `${CONSOLE_CONSTANTS.WORKER} Data logged in file successfully`);
+      console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Data logged in file successfully`);
     }
   }
 }
@@ -75,6 +75,29 @@ class WorkerParent {
     setInterval(async () => {
       await this.processChecks();
     }, 1000 * 60);
+
+    setInterval(async () => {
+      await this.rotateLogs();
+    }, 1000 * 60 * 60 * 24);
+  }
+
+  // Rotating logs to save memory and compress them
+  async rotateLogs() {
+    const logs = new Logs();
+
+    const { error, fileList } = await logs.getLogFiles();
+    if (error && fileList.length === 0) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} ${error}`);
+
+    let logFileCompressionError = ""
+    fileList.forEach(async (fileName) => {
+      const { error } = await logs.compressDataAndCreateFile(fileName);
+      if (error) logFileCompressionError = `${logFileCompressionError} \n ${error} in ${fileName}.log`;
+    });
+
+    if (logFileCompressionError)
+      console.log(CONSOLE_COLORS.RED, `${error}`);
+    else
+      console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Files compressed successfully`);
   }
 }
 
