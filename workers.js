@@ -99,6 +99,12 @@ class WorkerParent {
     else
       console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Files compressed successfully`);
   }
+
+  // See uncompressed data
+  async seeUncompressedLogs() {
+    const logs = new Logs();
+    await logs.decompressData("45cbec3974a2c3be1d8c9b8c9ba85c7a1360d507_1691602285462.gz.b64");
+  }
 }
 
 export default WorkerParent;
