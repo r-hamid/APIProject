@@ -4,15 +4,14 @@ import { checkRouteHandler, checksRoutes } from "./checks.js";
 
 // Defining route handlers with default not found route
 export const routeHandlers = {
-  notFound: (_data, callback) => {
-    callback(404, { message: "No such route exists!" });
+  notFound: (_data) => {
+    return { statusCode: 404, payload: { message: "No such route exists!" }, };
   },
-  sample: (_data, callback) => {
-    callback(406, { name: "Hamid Rasool Testing" });
+
+  ping: async (_data) => {
+    return { statusCode: 200, payload: { message: "I am still alive." }, };
   },
-  ping: (_data, callback) => {
-    callback(200, { message: "I am still alive." })
-  },
+
   ...userRouteHandlers,
   ...tokenRouteHandlers,
   ...checkRouteHandler,
@@ -20,7 +19,6 @@ export const routeHandlers = {
 
 // List of routes
 export const routes = {
-  sample: routeHandlers.sample,
   ping: routeHandlers.ping,
   ...userRoutes,
   ...tokenRoutes,

@@ -23,7 +23,7 @@ function unifiedServer(req, res) {
   });
 
   // Making sure that we have recieved all the data
-  req.on("end", () => {
+  req.on("end", async () => {
     recievedDataBuffer.body += decoder.end();
 
     if (recievedDataBuffer.body)
@@ -31,17 +31,17 @@ function unifiedServer(req, res) {
 
     // Checking for route if found will move to relevant routeHandler
     if (routes[parsedPath]) {
-      routeHandlers[parsedPath](recievedDataBuffer, (statusCode, payload) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.writeHead(statusCode || 200);
-        res.end(payload ? JSON.stringify(payload) : undefined);
-      });
+      const { statusCode, payload } = await routeHandlers[parsedPath](recievedDataBuffer);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(statusCode || 200);
+      res.end(payload ? JSON.stringify(payload) : undefined);
     } else {
-      routeHandlers.notFound(recievedDataBuffer, (statusCode, payload) => {
-        res.setHeader('Content-Type', 'application/json');
-        res.writeHead(statusCode || 404);
-        res.end(payload ? JSON.stringify(payload) : undefined);
-      });
+      const { statusCode, payload } = routeHandlers.notFound(recievedDataBuffer);
+
+      res.setHeader('Content-Type', 'application/json');
+      res.writeHead(statusCode || 404);
+      res.end(payload ? JSON.stringify(payload) : undefined);
     }
   });
 }

@@ -21,8 +21,8 @@ class Server {
   }
 
   createServer() {
-    this.httpServer = createServer((req, res) => unifiedServer(req, res))
-    this.httpsServer = createHttpsServer(this.sslConfig, (req, res) => unifiedServer(req, res))
+    this.httpServer = createServer((req, res) => unifiedServer(req, res));
+    this.httpsServer = createHttpsServer(this.sslConfig, (req, res) => unifiedServer(req, res));
   }
 
   initServer() {
