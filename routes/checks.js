@@ -247,5 +247,5 @@ export const checkRouteHandler = {
 };
 
 export const checksRoutes = {
-  checks: checkRouteHandler.checks,
+  "api/checks": checkRouteHandler.checks,
 };

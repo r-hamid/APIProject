@@ -147,5 +147,5 @@ export const tokenRouteHandlers = {
 
 // List of routes
 export const tokenRoutes = {
-  tokens: tokenRouteHandlers.tokens,
+  "api/tokens": tokenRouteHandlers.tokens,
 };

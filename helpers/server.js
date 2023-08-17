@@ -31,11 +31,21 @@ function unifiedServer(req, res) {
 
     // Checking for route if found will move to relevant routeHandler
     if (routes[parsedPath]) {
-      const { statusCode, payload } = await routeHandlers[parsedPath](recievedDataBuffer);
+      const { statusCode, payload, contentType } = await routeHandlers[parsedPath === "" ? "index" : parsedPath](recievedDataBuffer);
+      const contentTypeRecieved = typeof contentType === "string" ? contentType : "json";
 
-      res.setHeader('Content-Type', 'application/json');
+      let payloadStringified = "";
+      if (contentTypeRecieved === "json") {
+        res.setHeader("Content-Type", "application/json");
+        payloadStringified = payload ? JSON.stringify(payload) : "";
+      }
+      if (contentTypeRecieved === "html") {
+        res.setHeader("Content-Type", "text/html");
+        payloadStringified = typeof payload === "string" ? payload : "";
+      }
+
       res.writeHead(statusCode || 200);
-      res.end(payload ? JSON.stringify(payload) : undefined);
+      res.end(payloadStringified);
     } else {
       const { statusCode, payload } = routeHandlers.notFound(recievedDataBuffer);
 

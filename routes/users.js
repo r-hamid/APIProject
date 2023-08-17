@@ -157,5 +157,5 @@ export const userRouteHandlers = {
 
 // List of routes
 export const userRoutes = {
-  users: userRouteHandlers.users,
+  "api/users": userRouteHandlers.users,
 };

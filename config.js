@@ -10,6 +10,12 @@ const environments = {
       authToken: "6881862de62a3c03d7f77dfd917373cb",
       fromPhone: "+12179088755",
     },
+    globalTemplateVars: {
+      baseUrl: "http://localhost:3000",
+      companyName: "NotARealCompany",
+      yearCreated: "2023",
+      projectTitle: "UpTimeTracker",
+    },
   },
   production: {
     httpPort: 5000,
