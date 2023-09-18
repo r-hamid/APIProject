@@ -1,6 +1,7 @@
 import { userRouteHandlers, userRoutes } from "./users.js";
 import { tokenRouteHandlers, tokenRoutes } from "./tokens.js";
 import { checkRouteHandler, checksRoutes } from "./checks.js";
+import { publicRouteHandler, publicRoutes } from "./public.js";
 
 import { getTemplateByName } from "../helpers/templateManagement.js";
 import { APIMethods } from "../constants.js";
@@ -11,7 +12,7 @@ export const routeHandlers = {
   index: async (data) => {
     const { method } = data;
     if (method !== APIMethods.GET)
-      return { statusCode: 502, payload: { message: "This method is allowed" } };
+      return { statusCode: 502, payload: { message: "This method is not allowed" } };
 
     const templateData = {
       "body.title": "Hello World!",
@@ -37,6 +38,7 @@ export const routeHandlers = {
   ...userRouteHandlers,
   ...tokenRouteHandlers,
   ...checkRouteHandler,
+  ...publicRouteHandler,
 };
 
 // List of routes
@@ -46,4 +48,5 @@ export const routes = {
   ...userRoutes,
   ...tokenRoutes,
   ...checksRoutes,
+  ...publicRoutes,
 };

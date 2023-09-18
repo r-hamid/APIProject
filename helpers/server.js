@@ -14,6 +14,7 @@ function unifiedServer(req, res) {
     headers: req.headers,
     method: req.method,
     queryParams: parsedURL.query,
+    trimmedPath: parsedURL.path,
     body: "",
   };
 
@@ -30,18 +31,45 @@ function unifiedServer(req, res) {
       recievedDataBuffer.body = JSON.parse(recievedDataBuffer.body);
 
     // Checking for route if found will move to relevant routeHandler
-    if (routes[parsedPath]) {
-      const { statusCode, payload, contentType } = await routeHandlers[parsedPath === "" ? "index" : parsedPath](recievedDataBuffer);
+    if (routes[parsedPath.includes("public") ? "public" : parsedPath]) {
+      const { statusCode, payload, contentType } = await routeHandlers[
+        parsedPath === "" ? "index" : (parsedPath.includes("public") ? "public" : parsedPath)
+      ](recievedDataBuffer);
       const contentTypeRecieved = typeof contentType === "string" ? contentType : "json";
 
       let payloadStringified = "";
-      if (contentTypeRecieved === "json") {
-        res.setHeader("Content-Type", "application/json");
-        payloadStringified = payload ? JSON.stringify(payload) : "";
-      }
-      if (contentTypeRecieved === "html") {
-        res.setHeader("Content-Type", "text/html");
-        payloadStringified = typeof payload === "string" ? payload : "";
+      switch(contentTypeRecieved) {
+        case "json":
+          res.setHeader("Content-Type", "application/json");
+          payloadStringified = payload ? JSON.stringify(payload) : "";
+          break;
+        case "html":
+          res.setHeader("Content-Type", "text/html");
+          payloadStringified = typeof payload === "string" ? payload : "";
+          break;
+        case "css":
+          res.setHeader("Content-Type", "text/css");
+          payloadStringified = typeof payload !== "undefined" ? payload : "";
+          break;
+        case "js":
+          res.setHeader("Content-Type", "text/javascript");
+          payloadStringified = typeof payload !== "undefined" ? payload : "";
+          break;
+        case "ico":
+          res.setHeader("Content-Type", "image/x-icon");
+          payloadStringified = typeof payload !== "undefined" ? payload : "";
+          break;
+        case "jpg":
+          res.setHeader("Content-Type", "image/jpeg");
+          payloadStringified = typeof payload !== "undefined" ? payload : "";
+          break;
+        case "png":
+          res.setHeader("Content-Type", "image/x-png");
+          payloadStringified = typeof payload !== "undefined" ? payload : "";
+          break;
+        default:
+          console.log("Default switch statement");
+          break;
       }
 
       res.writeHead(statusCode || 200);
