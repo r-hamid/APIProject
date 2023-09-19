@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <!-- General Settings -->
+    <meta charset="utf-8">
+    <meta http-equiv="content-language" content="eu-us">
+    <base href="{global.baseUrl}" />
+
+    <!-- Page Related Configurations -->
+    <title> {head.title} | {global.projectTitle} </title>
+    <meta name="description" content="{head.description}">
+
+    <!-- Static Assets -->
+    <link type="image/x-icon" rel="icon" href="public/favicon.ico" />
+    <link type="text/css" rel="stylesheet" href="public/app.css" />
+    <script type="text/javascript" charset="utf-8" src="public/app.js"></script>
+  </head>
+  <body class="{body.class}">
+    <!-- All content will be wrapped under this section -->
+    <div class="wrapper">
+      <!-- Header Section of our website -->
+      <div class="header">
+        <a class="logo" href="/">
+          <img alt="Logo" src="public/logo.png" />
+        </a>
+        <!-- Header Links -->
+        <ul class="menu">
+          <li>
+            <a href="/">Home</a>
+          </li>
+          <li class="loggedOut">
+            <a href="/">SignUp</a>
+          </li>
+          <li class="loggedOut">
+            <a href="/">Login</a>
+          </li>
+          <li class="loggedIn">
+            <a href="/">Dashboard</a>
+          </li>
+          <li class="loggedIn">
+            <a href="/">Profile Settings</a>
+          </li>
+          <li class="loggedIn">
+            <a href="/">LogOut</a>
+          </li>
+        </ul>
+      </div>
+
+      <!-- Dynamic body part will be rendered in this section -->
+      <div class="content">

@@ -1,17 +1,28 @@
-import server from "./server.js";
-import worker from "./workers.js";
+import Server from "./server.js";
+import Worker from "./workers.js";
 
-const app = {
-  init: () => {
+class App {
+  server;
+
+  worker;
+
+  constructor() {
+    this.server = new Server();
+    this.worker = new Worker();
+  }
+
+  init() {
     // statring server
-    server.init();
+    this.server.createServer();
+    this.server.initServer();
 
     // Starting worker
-    worker.init();
-  },
-};
+    this.worker.initWorker();
+  }
+}
 
 // Starting all servers
+const app = new App();
 app.init();
 
 export default app;

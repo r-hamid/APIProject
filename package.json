@@ -1,3 +1,7 @@
 {
-  "type": "module"
+  "type": "module",
+  "scripts": {
+    "dev": "NODE_ENV=staging node index.js",
+    "start": "NODE_ENV=production node index.js"
+  }
 }

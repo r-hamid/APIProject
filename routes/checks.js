@@ -5,18 +5,19 @@ import envConfig from "../config.js";
 import generateToken from "../helpers/generateToken.js";
 
 export const checkRouteHandler = {
-  checks: (data, callback) => {
+  checks: async (data) => {
     const { method } = data;
 
     if (checksRoutesAcceptedMethods.indexOf(method) > -1) {
-      checkRouteHandler[method.toLowerCase()](data, callback);
+      const { statusCode, payload } = await checkRouteHandler[method.toLowerCase()](data);
+      return { statusCode, payload };
     } else {
-      callback(405, { message: "This method is not allowed for user." })
+      return { statusCode: 405, payload: { message: "This method is not allowed for user." } };
     }
   },
 
   // Getting check details from check id
-  get: (data, callback) => {
+  get: async (data) => {
     // Getting token & checkId from request bodu
     const { headers, queryParams } = data;
     let { checkId } = queryParams;
@@ -27,41 +28,34 @@ export const checkRouteHandler = {
     token = (typeof token === "string" && token.trim().length > 0) ? token.trim() : false;
 
     // Reading token details from request
-    readData("tokens", token, (err, tokenData) => {
-      if (err && !tokenData) {
-        callback(404, { message: "Token does not exists or expired" });
-        return;
-      }
+    const { error: readTokenError, data: tokenData } = await readData("tokens", token);
+    if (readTokenError && !tokenData)
+      return { statusCode: 404, payload: { message: "Token does not exists or expired" } };
 
-      // Get User details from token's phone number
-      const parsedTokenData = JSON.parse(tokenData);
-      readData("users", parsedTokenData.phone, (err, userData) => {
-        if (err && !userData) {
-          callback(404, { message: "User not found or invalid token" });
-          return;
-        }
+    // Get User details from token's phone number
+    const { error: readUserError, data: userData } = await readData("users", tokenData.phone);
+    if (readUserError && !userData)
+      return { statusCode: 404, payload: { message: "User not found or invalid token" } };
 
-        // Make sure that checkId associated with current user
-        const parsedUserData = JSON.parse(userData);
-        if (!(typeof parsedUserData.checks === "object" && parsedUserData.checks instanceof Array && parsedUserData.checks.length > 0 && parsedUserData.checks.indexOf(checkId) > -1)) {
-          callback(404, { message: "Check id not linked with you" });
-          return;
-        }
+    // Make sure that checkId associated with current user
+    if (!(
+      typeof userData.checks === "object"
+      && userData.checks instanceof Array
+      && userData.checks.length > 0
+      && userData.checks.indexOf(checkId) > -1
+    ))
+      return { statusCode: 404, payload: { message: "Check id not linked with you" } };
 
-        // Get check data and return it
-        readData("checks", checkId, (err, checkData) => {
-          if (err && !checkData) {
-            callback(404, { message: "No check found against provided identifier" });
-          } else {
-            callback(200, { message: "Check data fetched successfully", data: JSON.parse(checkData) });
-          }
-        });
-      });
-    });
+    // Get check data and return it
+    const { error: readCheckError, data: checkData } = await readData("checks", checkId);
+    if (readCheckError && !checkData)
+      return { statusCode: 404, payload: { message: "No check found against provided identifier" } };
+
+    return { statusCode: 200, payload: { message: "Check data fetched successfully", data: checkData } };
   },
 
   // Adding new checks in the system
-  post: (data, callback) => {
+  post: async (data) => {
     const { body, headers } = data;
     const { token } = headers;
     let { protocol, url, method, successCodes, timeOutSeconds } = body;
@@ -73,14 +67,12 @@ export const checkRouteHandler = {
     successCodes = (typeof successCodes === "object" && successCodes instanceof Array && successCodes.length > 0) ? successCodes : false;
     timeOutSeconds = (typeof timeOutSeconds === "number" && timeOutSeconds > 0 && timeOutSeconds <= 5) ? timeOutSeconds : false;
 
-    if (!(protocol && url && method && successCodes && timeOutSeconds)) {
-      callback(400, { message: "Required fields are missing" });
-      return;
-    }
+    if (!(protocol && url && method && successCodes && timeOutSeconds))
+      return { statusCode: 400, payload: { message: "Required fields are missing" } };
 
     // Generating Check Object to store
     const checksData = {
-      id: generateToken(20),
+      id: generateToken(8),
       protocol,
       url,
       method,
@@ -89,74 +81,53 @@ export const checkRouteHandler = {
     };
 
     // Getting user phone from token
-    readData("tokens", token, (err, tokenData) => {
-      if (err && !tokenData) {
-        callback(404, { message: "provided token does not exists or expired" });
-        return;
-      }
+    const { error: readTokenError , data: tokenData } = await readData("tokens", token);
+    if (readTokenError && !tokenData)
+      return { statusCode: 404, payload: { message: "provided token does not exists or expired" } };
 
-      const parsedTokenData = JSON.parse(tokenData);
-      
-      // authorize token and then move forward
-      authorizeToken(token, parsedTokenData.phone, (isUserAuthorized) => {
-        if (!isUserAuthorized) {
-          callback(403, { message: "Forbidden to access this endpoint" });
-          return;
-        }
+    // authorize token and then move forward
+    const { isAuthorized } = await authorizeToken(token, tokenData.phone);
+    if (!isAuthorized)
+      return { statusCode: 403, payload: { message: "Forbidden to access this endpoint" } };
 
-        // Reading userData to make sure that checks are not exceeding limit
-        readData("users", parsedTokenData.phone, (err, userData) => {
-          if (err && !userData) {
-            callback(404, { message: "No user found against this token" });
-            return;
-          }
+    // Reading userData to make sure that checks are not exceeding limit
+    const { error: readUserDataError, data: userData } = await readData("users", tokenData.phone);
+    if (readUserDataError && !userData)
+      return { statusCode: 404, payload: { message: "No user found against this token" } };
 
-          // Getting details about checks linked to this user
-          const parsedUserData = JSON.parse(userData);
-          if (
-            typeof parsedUserData.checks === "object" &&
-            parsedUserData.checks instanceof Array &&
-            parsedUserData.checks.length >= envConfig.totalChecksAllowed
-          ) {
-            callback(400, { message: "Your check limit has reached" });
-            return;
-          }
+    if (
+      typeof userData.checks === "object" &&
+      userData.checks instanceof Array &&
+      userData.checks.length >= envConfig.totalChecksAllowed
+    )
+      return { statusCode: 400, payload: { message: "Your check limit has reached" } };
 
-          // Storing checks details in file
-          createFile(
-            "checks",
-            checksData.id,
-            { ...checksData, userPhone: parsedTokenData.phone },
-            (err) => {
-              if (err) {
-                callback(500, { message: "Unable to create new check. Please try again later" });
-                return;
-              }
+    // Storing checks details in file
+    const { error: createCheckError } = await createFile(
+      "checks",
+      checksData.id,
+      { ...checksData, userPhone: userData.phone }
+    );
+    if (createCheckError)
+      return { statusCode: 500, payload: { message: "Unable to create new check. Please try again later" } };
 
-              // Storing check id into user files to keep track
-              const existingChecks = parsedUserData.checks || [];
-              const newUserData = {
-                ...parsedUserData,
-                checks: [...existingChecks, checksData.id ],
-              };
-              
-              // Saving checks into user file
-              updateFileContent("users", parsedUserData.phone, newUserData, (err) => {
-                if (err) {
-                  callback(500, { message: "Unable to update the user content" });
-                } else {
-                  callback(200, { message: "New check created successfully", data: checksData });
-                }
-              });
-            }
-          );
-        });
-      });
-    });
+    // Storing check id into user files to keep track
+    const existingChecks = userData.checks || [];
+    const newUserData = {
+      ...userData,
+      checks: [...existingChecks, checksData.id ],
+    };
+
+    // Saving checks into user file
+    const { error: updateUserError } = await updateFileContent("users", userData.phone, newUserData);
+    if (updateUserError)
+      return { statusCode: 500, payload: { message: "Unable to update the user content" } };
+
+    return { statusCode: 200, payload: { message: "New check created successfully", data: checksData } };
   },
 
   // Updating check details
-  put: (data, callback) => {
+  put: async (data) => {
     const { headers, queryParams, body } = data;
     let { token } = headers;
     let { checkId } = queryParams;
@@ -173,72 +144,55 @@ export const checkRouteHandler = {
     successCodes = (typeof successCodes === "object" && successCodes instanceof Array && successCodes.length > 0) ? successCodes : false;
     timeOutSeconds = (typeof timeOutSeconds === "number" && timeOutSeconds > 0 && timeOutSeconds <= 5) ? timeOutSeconds : false;
 
-    if (!(token && checkId && (protocol || url || method || successCodes || timeOutSeconds))) {
-      callback(400, { message: "Required fields are missing" });
-      return;
-    }
+    if (!(token && checkId && (protocol || url || method || successCodes || timeOutSeconds)))
+      return { statusCode: 400, payload: { message: "Required fields are missing" } };
 
     // Getting token details from token
-    readData("tokens", token, (err, tokenData) => {
-      if (err && !tokenData) {
-        callback(404, { message: "Token not found!" });
-        return;
-      }
+    const { error: readTokenError, data: tokenData } = await readData("tokens", token);
+    if (readTokenError && !tokenData)
+      return { statusCode: 404, payload: { message: "Token not found!" } };
 
-      // Verifying that provided token is valid and has not expired
-      const parsedTokenData = JSON.parse(tokenData);
-      authorizeToken(token, parsedTokenData.phone, (isUserAuthorized) => {
-        if (!isUserAuthorized) {
-          callback(401, { message: "Provided token has expired" });
-          return;
-        }
+    // Verifying that provided token is valid and has not expired
+    const { isAuthorized } = await authorizeToken(token, tokenData.phone);
+    if (!isAuthorized)
+      return { statusCode: 401, payload: { message: "Provided token has expired" } };
 
-        // Getting user details from token
-        readData("users", parsedTokenData.phone, (err, userData) => {
-          if (err && !userData) {
-            callback(404, { message: "User not found against provided token" });
-            return;
-          }
+    // Getting user details from token
+    const { error: readUserData, data: userData } = await readData("users", tokenData.phone);
+    if (readUserData && !userData)
+      return { statusCode: 404, payload: { message: "User not found against provided token" } };
 
-          // Checking whether this checkId is associated with authorized user
-          const parsedUserData = JSON.parse(userData);
-          if (!(typeof parsedUserData.checks === "object" && parsedUserData.checks instanceof Array && parsedUserData.checks.length > 0 && parsedUserData.checks.indexOf(checkId) > -1)) {
-            callback(403, { message: "Check id not linked with you" });
-            return;
-          }
+    // Checking whether this checkId is associated with authorized user
+    if (!(
+      typeof userData.checks === "object"
+      && userData.checks instanceof Array
+      && userData.checks.length > 0
+      && userData.checks.indexOf(checkId) > -1
+    ))
+      return { statusCode: 403, payload: { message: "Check id not linked with you" } };
 
-          // Getting check details with checkId
-          readData("checks", checkId, (err, checkData) => {
-            if (err && !checkData) {
-              callback(404, { message: "Check does not found" });
-              return;
-            }
+    // Getting check details with checkId
+    const { error: readCheckError, data: checkData } = await readData("checks", checkId);
+    if (readCheckError && !checkData)
+      return { statusCode: 404, payload: { message: "Check does not found" } };
 
-            // Now parse the check and update provided fields
-            const parsedCheckData = JSON.parse(checkData);
-            if (protocol) parsedCheckData.protocol = protocol;
-            if (url) parsedCheckData.url = url;
-            if (method) parsedCheckData.method = method;
-            if (successCodes) parsedCheckData.successCodes = successCodes;
-            if (timeOutSeconds) parsedCheckData.timeOutSeconds = timeOutSeconds;
+    // Now parse the check and update provided fields
+    if (protocol) checkData.protocol = protocol;
+    if (url) checkData.url = url;
+    if (method) checkData.method = method;
+    if (successCodes) checkData.successCodes = successCodes;
+    if (timeOutSeconds) checkData.timeOutSeconds = timeOutSeconds;
 
-            // Updating check data in file
-            updateFileContent("checks", checkId, parsedCheckData, (err) => {
-              if (err) {
-                callback(500, { message: "Could not update the check details at this moment" });
-              } else {
-                callback(200, { message: "Check details updated successfully", data: parsedCheckData });
-              }
-            });
-          });
-        });
+    // Updating check data in file
+    const { error: updateCheckError } = await updateFileContent("checks", checkId, checkData);
+    if (updateCheckError)
+      return { statusCode: 500, payload: { message: "Could not update the check details at this moment" } };
 
-      });
-    });
+    return { statusCode: 200, payload: { message: "Check details updated successfully", data: checkData } };
   },
 
   // Deleting Check by check id
-  delete: (data, callback) => {
+  delete: async (data) => {
     const { queryParams, headers } = data;
     let { checkId } = queryParams;
     let { token } = headers;
@@ -247,65 +201,51 @@ export const checkRouteHandler = {
     checkId = (typeof checkId === "string" && checkId.trim().length > 0) ? checkId.trim() : false;
     token = (typeof token === "string" && token.trim().length > 0) ? token.trim() : false;
 
-    if (!checkId && !token) {
-      callback(400, { message: "Missing required fields" });
-      return;
-    }
+    if (!checkId && !token)
+      return { statusCode: 400, payload: { message: "Missing required fields" } };
 
     // Getting token details
-    readData("tokens", token, (err, tokenData) => {
-      if (err && !tokenData) {
-        callback(404, { message: "No token found against user" });
-        return;
-      }
-      const parsedTokenData = JSON.parse(tokenData);
+    const { error: readTokenError, data: tokenData } = await readData("tokens", token);
+    if (readTokenError && !tokenData)
+      return { statusCode: 404, payload: { message: "No token found against user" } };
 
-      // authorize token using phone
-      authorizeToken(token, parsedTokenData.phone, (isUserAuthorized) => {
-        if (!isUserAuthorized) {
-          callback(403, { message: "User is forbidden from accessing this endpoint" });
-          return;
-        }
+    // authorize token using phone
+    const { isAuthorized } = await authorizeToken(token, tokenData.phone);
+    if (!isAuthorized)
+      return { statusCode: 403, payload: { message: "User is forbidden from accessing this endpoint" } };
 
-        // Getting user details from token
-        readData("users", parsedTokenData.phone, (err, userData) => {
-          if (err && !userData) {
-            callback(404, { message: "No user found against provided data" });
-          }
-          const parsedUserData = JSON.parse(userData);
+    // Getting user details from token
+    const { error: readUserError, data: userData } = await readData("users", tokenData.phone);
+    if (readUserError && !userData)
+      return { statusCode: 404, payload: { message: "No user found against provided data" } };
           
-          // Checking if check is associated with this user
-          if (!(typeof parsedUserData.checks === "object" && parsedUserData.checks instanceof Array && parsedUserData.checks.length > 0 && parsedUserData.checks.indexOf(checkId) > -1)) {
-            callback(404, { message: "Check id not linked with you" });
-            return;
-          }
+    // Checking if check is associated with this user
+    if (!(
+      typeof userData.checks === "object"
+      && userData.checks instanceof Array
+      && userData.checks.length > 0
+      && userData.checks.indexOf(checkId) > -1
+    ))
+      return { statusCode: 404, payload: { message: "Check id not linked with you" } };
 
-          // Deleting check from user list
-          const indexOfCheck = parsedUserData.checks.indexOf(checkId);
-          parsedUserData.checks.splice(indexOfCheck, 1);
+    // Deleting check from user list
+    const indexOfCheck = userData.checks.indexOf(checkId);
+    userData.checks.splice(indexOfCheck, 1);
 
-          // Updating content of user
-          updateFileContent("users", parsedTokenData.phone, parsedUserData, (err) => {
-            if (err) {
-              callback(500, { message: "Could not update user data at this moment." });
-              return;
-            }
+    // Updating content of user
+    const { error: updateUserError } = await updateFileContent("users", tokenData.phone, userData);
+    if (updateUserError)
+      return { statusCode: 500, payload: { message: "Could not update user data at this moment." } };
 
-            // Deleting check from file system
-            deleteFile("checks", checkId, (err) => {
-              if (err) {
-                callback(500, { message: "Could not delete check at this moment." });
-              } else {
-                callback(200, { message: "Check deleted successfully" });
-              }
-            });
-          });
-        });
-      });
-    });
+    // Deleting check from file system
+    const { error: deleteCheckError } = await deleteFile("checks", checkId);
+    if (deleteCheckError)
+      return { statusCode: 500, payload: { message: "Could not delete check at this moment." } };
+
+    return { statusCode: 200, payload: { message: "Check deleted successfully" } };
   },
 };
 
 export const checksRoutes = {
-  checks: checkRouteHandler.checks,
+  "api/checks": checkRouteHandler.checks,
 };

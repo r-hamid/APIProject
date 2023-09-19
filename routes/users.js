@@ -5,50 +5,40 @@ import authorizeUser from "../helpers/authorize.js";
 
 // User RouteHandler defined
 export const userRouteHandlers = {
-  users: (data, callback) => {
+  users: async (data) => {
     const { method } = data;
 
     if (userRoutesAcceptedMethods.indexOf(method) > -1) {
-      userRouteHandlers[method.toLowerCase()](data, callback);
+      const { statusCode, payload } = await userRouteHandlers[method.toLowerCase()](data);
+      return { statusCode, payload };
     } else {
-      callback(405, { message: "This method is not allowed for user." })
+      return { statusCode: 405, payload: { message: "This method is not allowed for user." } };
     }
   },
 
-  get: (data, callback) => {
+  get: async (data) => {
     // Getting Phone from Query Object
     const { queryParams, headers } = data;
     const { phone } = queryParams;
     const { token } = headers;
 
-    authorizeUser(token, phone, (isAuthorized) => {
-      if (!isAuthorized) {
-        callback(401, { message: "unauthorized" });
-        return;
-      }
+    const { isAuthorized } = await authorizeUser(token, phone);
+    if (!isAuthorized)
+      return { statusCode: 401, payload: { message: "unauthorized" } };
 
-      if (!(typeof phone === "string" && phone.length === 14)) {
-        callback(400, { message: "No valid phone number provided for user search" });
-        return;
-      }
+    if (!(typeof phone === "string" && phone.length === 14))
+      return { statusCode: 400, payload: { message: "No valid phone number provided for user search" } };
   
-      readData("users", phone, (err, data) => {
-        if (err) {
-          callback(404, { message: "No user found against provided phone number" });
-        } else {
-          console.log("phone number mentioned in query params", phone);
-          if (data) {
-            callback(200, { message: "User found successfully!", data: JSON.parse(data) });
-          } else {
-            callback(500, { message: "Invalid data format found!" })
-          }
-        }
-      });
-    });
+    const { error: readUserError, data: userData } = await readData("users", phone);
+
+    if (readUserError && !userData)
+      return { statusCode: 404, payload: { message: "No user found against provided phone number" } };
+
+    return { statusCode: 200, payload: { message: "User found successfully!", data: userData } };
   },
 
   // Adding new user to database
-  post: (data, callback) => {
+  post: async (data) => {
     // Getting all the fields are making sure they exists
     const { body } = data;
     let { firstName, lastName, phone, password, tosAgreement } = body;
@@ -61,16 +51,12 @@ export const userRouteHandlers = {
     tosAgreement = typeof(tosAgreement) === "boolean" ? tosAgreement : false;
 
     // Returning error and terminating function
-    if (!(firstName && lastName && phone && password && tosAgreement)) {
-      callback(400, { message: "Required fields are missing!" });
-      return;
-    }
+    if (!(firstName && lastName && phone && password && tosAgreement))
+      return { statusCode: 400, payload: { message: "Required fields are missing!" } };
 
     password = hashPassword(password);
-    if (typeof password === "boolean") {
-      callback(400, "Password cannot be hashed");
-      return;
-    }
+    if (typeof password === "boolean")
+      return { statusCode: 400, payload: { message: "Password cannot be hashed" } };
 
     const userData = {
       firstName,
@@ -80,134 +66,96 @@ export const userRouteHandlers = {
       tosAgreement,
     };
 
-    readData("users", phone, (err, data) => {
-      if (data && !err) {
-        callback(400, { message: "User with this phone number already exists." });
-        return;
-      }
+    const { error: readUserDataError, data: readUserData } = await readData("users", phone);
+    if (readUserData && !readUserDataError)
+      return { statusCode: 400, payload: { message: "User with this phone number already exists." } };
 
-      createFile("users", phone, userData, (err, data) => {
-        if (err)
-          callback(500, { message: "Cannot insert this user." });
-        else
-          callback(200, { message: "User created successfully!", data: userData });
-      });
-    });
+    const { error: createUserError } = await createFile("users", phone, userData);
+    if (createUserError)
+      return { statusCode: 500, payload: { message: "Cannot insert this user." } };
+
+    return { statusCode: 200, payload: { message: "User created successfully!", data: userData } };
   },
 
-  put: (data, callback) => {
+  put: async (data) => {
     const { queryParams, body, headers } = data;
     const { phone } = queryParams;
     const { firstName, lastName, password } = body;
     const { token } = headers;
 
     // Checking whether phone is present in query parameters
-    if (!(typeof phone === "string" && phone.length > 0)) {
-      callback(400, { message: "Please provide a valid phone number " });
-      return;
-    }
+    if (!(typeof phone === "string" && phone.length > 0))
+      return { statusCode: 400, payload: { message: "Please provide a valid phone number " } };
 
     // Checking whether we recieve any data to update or not
-    if (!(firstName || lastName || password)) {
-      callback(400, { message: "body should not be empty!" });
-      return;
-    }
+    if (!(firstName || lastName || password))
+      return { statusCode: 400, payload: { message: "body should not be empty!" } };
 
-    authorizeUser(token, phone, (isAuthorized) => {
-      if (!isAuthorized) {
-        callback(401, { message: "unauthorized" });
-        return;
-      }
+    const { isAuthorized } = await authorizeUser(token, phone);
+    if (!isAuthorized)
+      return { statusCode: 401, payload: { message: "unauthorized" } };
 
-      // Updating data after reading that specific user from file
-      readData("users", phone, (err, data) => {
-        if (err) {
-          callback(400, { message: "No user exists against provided phone number" });
-          return;
-        }
+    // Updating data after reading that specific user from file
+    const { error: readUserError, data: userData } = await readData("users", phone);
+    if (readUserError)
+      return { statusCode: 400, payload: { message: "No user exists against provided phone number" } };
 
-        const userData = JSON.parse(data);
-        if (firstName) {
-          userData.firstName = firstName;
-        }
+    if (firstName) userData.firstName = firstName;
+    if (lastName) userData.lastName = lastName;
+    if (password) userData.password = hashPassword(password);
 
-        if (lastName) {
-          userData.lastName = lastName;
-        }
+    const { error: updateUserError } = await updateFileContent("users", phone, userData);
+    if (updateUserError)
+      return { statusCode: 500, payload: { message: "Unable to update the user right now" } };
 
-        if (password) {
-          userData.password = hashPassword(password);
-        }
-
-        updateFileContent("users", phone, userData, (err) => {
-          if (err) {
-            callback(500, { message: "Unable to update the user right now" });
-          } else {
-            callback(200, { message: "User updated successfully!", data: userData });
-          }
-        });
-      });
-    });
+    return { statusCode: 200, payload: { message: "User updated successfully!", data: userData } };
   },
 
-  delete: (data, callback) => {
+  delete: async (data) => {
     const { queryParams, headers } = data;
     const { phone } = queryParams;
     const { token } = headers;
 
-    authorizeUser(token, phone, (isAuthorized) => {
-      if (!isAuthorized) {
-        callback(401, { message: "unauthorized" });
-        return;
-      }
+    const { isAuthorized } = await authorizeUser(token, phone);
+    if (!isAuthorized)
+      return { statusCode: 401, payload: { message: "unauthorized" } };
 
-      if (!(typeof phone === "string" && phone.length === 14)) {
-        callback(400, { message: "No valid phone number provided for user search" });
-        return;
-      }
+    if (!(typeof phone === "string" && phone.length === 14))
+      return { statusCode: 400, payload: { message: "No valid phone number provided for user search" }};
 
-      // Reading user from provided data
-      readData("users", phone, (err, userData) => {
-        if (err && !userData) {
-          callback(404, { message: "User not found" });
-          return;
+    // Reading user from provided data
+    const { error: readUserError, data: userData } = await readData("users", phone);
+    if (readUserError && !userData)
+      return { statusCode: 404, payload: { message: "User not found" } };
+
+    const { error: deleteUserError } = await deleteFile("users", userData.phone);
+    if (deleteUserError)
+      return { statusCode: 500, payload: { message: "Unable to delete the file, please try again in a while." } };
+
+    const { checks } = userData;
+    if (typeof checks === "object" && checks instanceof Array && checks.length > 0) {
+      // Deleting all checks for user
+      let checksDeleted = 0;
+      let checkUserError = "";
+
+      checks.forEach(async (check) => {
+        const { error: deleteCheckError } = await deleteFile("checks", check);
+        if (deleteCheckError) checkUserError = `${checkUserError} ${deleteCheckError} on ${check} \n`;
+
+        if (checksDeleted === checks.length) {
+          if (deletionErrors)
+            return { statusCode: 500, payload: { message: "Could not delete check file. Please try again later" } };
+          else
+            return { statusCode: 200, payload: { message: "User deleted successfully!" } };
         }
-        const parsedUserData = JSON.parse(userData);
-        deleteFile("users", parsedUserData.phone, (err) => {
-          if (err) {
-            callback(500, { message: "Unable to delete the file, please try again in a while." });
-            return;
-          }
-          const { checks } = parsedUserData;
-          if (typeof checks === "object" && checks instanceof Array && checks.length > 0) {
-            // Deleting all checks for user
-            let deletionErrors = false;
-            let checksDeleted = 0;
-
-            checks.forEach((check) => {
-              deleteFile("checks", check, (err) => {
-                if (err) {
-                  deletionErrors = true;
-                }
-
-                checksDeleted++;
-                if (checksDeleted === checks.length) {
-                  if (deletionErrors) {
-                    callback(500, { message: "Could not delete check file. Please try again later" });
-                  } else {
-                    callback(200, { message: "User deleted successfully!" });
-                  }
-                }
-              });
-            });
-          }
-        });
+        checksDeleted++;
       });
-    });
+    } else
+      return { statusCode: 200, payload: { message: "User deleted successfully!" } };
   },
 };
 
 // List of routes
 export const userRoutes = {
-  users: userRouteHandlers.users,
+  "api/users": userRouteHandlers.users,
 };

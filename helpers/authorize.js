@@ -1,21 +1,16 @@
 import { readData } from "../lib/data.js";
 
-const verifyToken = (token, phone, callback) => {
-  if (!(typeof token === "string" && token.trim().length > 0)) {
-    callback(false);
-    return;
-  }
+async function verifyToken(token, phone) {
+  if (!(typeof token === "string" && token.trim().length > 0))
+    return { error: "No token found!", isAuthorized: false };
 
-  readData("tokens", token, (err, data) => {
-    if (err && !data) {
-      callback(false);
-      return;
-    }
+  const { error, data: tokenData } = await readData("tokens", token);
+  if (error) return { error, isAuthorized: false };
 
-    const tokenData = JSON.parse(data);
-    if (tokenData.phone === phone && tokenData.expiresAt > Date.now()) callback(true);
-    else callback(false);
-  });
-};
+  if (tokenData.phone === phone && tokenData.expiresAt > Date.now())
+    return { error: false, isAuthorized: true };
+  
+  return { error: "Provided token has been expired", isAuthorized: false };
+}
 
 export default verifyToken;

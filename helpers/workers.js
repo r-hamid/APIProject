@@ -11,6 +11,8 @@ import {
   protocolsAcceptedForChecks,
   checkProtocol,
   CheckURLState,
+  CONSOLE_COLORS,
+  CONSOLE_CONSTANTS,
 } from "../constants.js";
 
 function alertUserToStatusChange(newCheckData) {
@@ -21,14 +23,14 @@ function alertUserToStatusChange(newCheckData) {
 
   sendSMS(phone, messageBody, (err) => {
     if(!err){
-      console.log("Success: User was alerted to a status change in their check, via sms: ",msg);
+      console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} User was alerted to a status change in their check, via sms`);
     } else {
-      console.log("Error: Could not send sms alert to user who had a state change in their check",err);
+      console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Could not send sms alert to user who had a state change in their check`);
     }
   });
 }
 
-function processCheckOutcome(checkData) {
+async function processCheckOutcome(checkData) {
   const { successCodes, lastChecked, state } = checkData;
 
   const currentState = !this.checkOutcome.error &&
@@ -42,16 +44,16 @@ function processCheckOutcome(checkData) {
   newCheckData.lastChecked = Date.now();
 
   this.logs(newCheckData, currentState, alertWanted);
-  updateFileContent("checks", newCheckData.id, newCheckData, (err) => {
-    if (err) console.log("Error trying to save updates to one of the checks");
-    else {
-      if (alertWanted) {
-        alertUserToStatusChange(newCheckData);
-      } else {
-        console.log("Check outcome has not changed, no alert needed");
-      }
+  const { error } = await updateFileContent("checks", newCheckData.id, newCheckData);
+
+  if (error) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} ${error}`);
+  else {
+    if (alertWanted) {
+      alertUserToStatusChange(newCheckData);
+    } else {
+      console.log(CONSOLE_COLORS.BLUE, `${CONSOLE_CONSTANTS.WORKER} Check outcome has not changed, no alert needed`);
     }
-  });
+  }
 }
 
 function callbackForRequestError(checkData, err, message) {
@@ -87,7 +89,7 @@ function validateData(checkData) {
 }
 
 function parseDataToSendRequest(checkData) {
-  let { protocol, url, method, timeOutSeconds } = checkData;
+  let { protocol, url, method } = checkData;
 
   // Adding details to send request
   const requestDetails = parse(`${protocol}://${url}`, true);
@@ -121,33 +123,30 @@ function parseDataToSendRequest(checkData) {
   requestData.end();
 }
 
-function GetEachContentFromFile(fileList) {
-  fileList.forEach((fileName) => {
-    fileName = fileName.replace('.json', '');
-    readData(checkFilesDirName, fileName, (err, checkData) => {
-      if (err && !checkData) console.log(`Error while reading ${fileName}`);
-      else {
-        const parsedData = JSON.parse(checkData);
-        const isDataValidated = validateData(parsedData);
-        if (isDataValidated) {
-          parseDataToSendRequest.call(this, parsedData);
-        }
-      }
-    });
-  });
+async function getFileContent(fileName) {
+  const { data, error } = await readData("checks", fileName);
+  if (error) console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} Data with the file ${fileName}.json not found`);
+  
+  return data;
 }
 
-function ListDownAllFilesAndFetchData(callback) {
-  listFilesInADir(checkFilesDirName, (filesList) => {
-    if (typeof filesList === "object" && filesList instanceof Array) {
-      callback(filesList);
-    } else {
-      console.log("No files found in the checks directory");
-    }
-  });
+async function ListDownAllFiles() {
+  const { error, fileList } = await listFilesInADir(checkFilesDirName);
+
+  if (error) {
+    console.log(CONSOLE_COLORS.RED, `${CONSOLE_CONSTANTS.WORKER} No checks have been defined by users yet`);
+    return { error: "No checks have been defined by users yet", fileList: [] }
+  } else {
+    const indexOfGitKeep = fileList.indexOf(".gitkeep");
+    if (indexOfGitKeep > -1) fileList.splice(indexOfGitKeep, 1);
+    if (fileList.length === 0) return { error: "No checks have been defined by users yet", fileList };
+    return { error: false, fileList };
+  }
 }
 
 export {
-  ListDownAllFilesAndFetchData,
-  GetEachContentFromFile,
+  parseDataToSendRequest,
+  ListDownAllFiles,
+  getFileContent,
+  validateData,
 };
