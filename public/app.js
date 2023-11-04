@@ -6,6 +6,20 @@ app.config = {
   session: false,
 };
 
+app.config.configMenu = function() {
+  if (app.config.session) {
+    (document.getElementsByClassName("loggedIn").style) ?
+      document.getElementsByClassName("loggedIn").style.display = "block" : null;
+    (document.getElementsByClassName("loggedOut").style) ?
+      document.getElementsByClassName("loggedIn").style.display = "none" : null;
+  } else {
+    (document.getElementsByClassName("loggedIn").style) ?
+      document.getElementsByClassName("loggedIn").style.display = "none" : null;
+    (document.getElementsByClassName("loggedOut").style) ?
+      document.getElementsByClassName("loggedIn").style.display = "block" : null;
+  }
+};
+
 app.config.request = function(path, method, queryStringObject, payload, headers, callback) {
   // Validation and Defaults
   path = typeof path === "string" ? path : "";
@@ -70,4 +84,41 @@ app.config.request = function(path, method, queryStringObject, payload, headers,
 
   // Sending request
   request.send(payloadStringified);
-}
+};
+
+app.config.bindForms = function() {
+  document.querySelector("form").addEventListener("submit", (e) => {
+    e.preventDefault();
+
+    const { attributes, elements } = e.target;
+    const formId = attributes.id.value;
+    const path = attributes.action.value;
+    const method = attributes.method.value.toUpperCase();
+
+    const payload = {};
+
+    for(let input in elements) {
+      if (typeof input === "string" && typeof input !== "undefined") {
+        if (elements[input].name === '') break;
+        payload[elements[input].name] = elements[input].value;
+      }
+    }
+
+    if (formId === "accountCreate") {
+      payload.tosAgreement = payload.tosAgreement === "true";
+    }
+
+    app.config.request(path, method, undefined, payload, undefined, (statusCode, response) => {
+      console.log({ statusCode, response });
+    });
+  });
+};
+
+app.init = function() {
+  app.config.configMenu();
+  app.config.bindForms();
+};
+
+window.onload = () => {
+  app.init();
+};

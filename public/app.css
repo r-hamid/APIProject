@@ -227,6 +227,18 @@ input.disabled{
   padding: 0 0 20px 0;
 }
 
+.inputWrapperFlex {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.inputWrapperFlex .inputLabel {
+  padding: 0;
+}
+.inputWrapperFlex input {
+  max-width: fit-content;
+}
+
 .inputLabel{
   padding: 0 0 5px 0;
   color: #808080;

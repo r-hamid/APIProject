@@ -6,7 +6,7 @@ import { routes, routeHandlers } from "../routes/index.js";
 function unifiedServer(req, res) {
   // Parsing URL to get request metadata
   const parsedURL = parse(req.url, true);
-  const parsedPath = parsedURL.pathname.replaceAll('/', '');
+  const parsedPath = parsedURL.pathname.replace(/^\/+|\/+$/g, "");
 
   // String decoder to fetch data
   const decoder = new StringDecoder("utf-8");
@@ -32,8 +32,8 @@ function unifiedServer(req, res) {
 
     // Checking for route if found will move to relevant routeHandler
     if (routes[parsedPath.includes("public") ? "public" : parsedPath]) {
-      const { statusCode, payload, contentType } = await routeHandlers[
-        parsedPath === "" ? "index" : (parsedPath.includes("public") ? "public" : parsedPath)
+      const { statusCode, payload, contentType } = await routes[
+        parsedPath.includes("public") ? "public" : parsedPath
       ](recievedDataBuffer);
       const contentTypeRecieved = typeof contentType === "string" ? contentType : "json";
 
